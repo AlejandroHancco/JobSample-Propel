@@ -8,7 +8,7 @@ This repository contains my technical exercise for the **Data Intern** position 
 - Cleaned dataset: `cleaned_salesforce_report.xlsx` by the [notebook](Part1_Data_Cleaning/data_cleaner.ipynb) `data_cleaner.ipynb`
 - Enriched dataset with public Genderize.io API to `enhanced_salesforce_report.xlsx` by the [script](Part1_Data_Cleaning/api_merger.py) `api_merger.py`
 - [Report](Part1_Data_Cleaning/Part1_Report.pdf)
-- If it can't be executed, maybe it's because you don't have the libaries. Try with pip install -r requirements.txt
+- If it can't be executed, maybe it's because your computer don't have the required libraries. Try with `pip install -r requirements.txt`
 
 ## Part 2 – Data Visualization
 - Built an interactive dashboard to visualize key trends.
