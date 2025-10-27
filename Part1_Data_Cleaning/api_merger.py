@@ -2,57 +2,42 @@ import pandas as pd
 import requests
 from tqdm import tqdm
 
-def get_genders_in_batches(names, batch_size=10):
+def enhance_gender(df: pd.DataFrame, name_col: str = "Full Name") -> pd.DataFrame:
     """
-    Fetch gender predictions in batches (up to 10 names per request).
-    Returns a dictionary mapping name -> gender.
+    Receives a DataFrame with a column of full names and returns the same DataFrame
+    with an added 'Gender' column filled using the Genderize.io API.
+    Only updates rows where gender is missing.
+    It only can fill 1000 names per day for free (100 per hour).
     """
-    results = {}
-    for i in tqdm(range(0, len(names), batch_size), desc="Fetching batches", unit="batch"):
-        batch = names[i:i+batch_size]
-        try:
-            response = requests.get(
-                "https://api.genderize.io",
-                params=[("name[]", name) for name in batch]
-            )
-            data = response.json()
-            for entry in data:
-                results[entry["name"]] = entry.get("gender")
-        except Exception as e:
-            print(f"⚠️ Error fetching batch starting at index {i}: {e}")
-            for name in batch:
-                results[name] = None
-    return results
-
-
-if __name__ == "__main__":
-    print("📂 Loading dataset...")
-    df = pd.read_excel("enhanced_salesforce_report.xlsx")
-
-    # Ensure the column exists
+    # Ensure the Gender column exists
     if "Gender" not in df.columns:
         df["Gender"] = None
 
-    # Get only names with missing gender
-    missing_gender_mask = df["Gender"].isna() | (df["Gender"] == "")
-    missing_names = df.loc[missing_gender_mask, "Full Name"].dropna().astype(str).str.strip().unique().tolist()
+    # Filter names missing gender
+    missing_mask = df["Gender"].isna() | (df["Gender"] == "")
+    missing_names = df.loc[missing_mask, name_col].dropna().astype(str).str.strip().unique().tolist()
 
-    print(f"🚀 Fetching gender data for {len(missing_names)} names without gender info...")
+    # Fetch gender for each name 
+    gender_map = {}
+    for name in tqdm(missing_names, desc="Fetching genders"):
+        try:
+            response = requests.get("https://api.genderize.io", params={"name": name})
+            data = response.json()
+            gender_map[name] = data.get("gender")
+        except Exception:
+            gender_map[name] = None
 
-    try:
-        if missing_names:
-            gender_map = get_genders_in_batches(missing_names)
+    # Map results back to DataFrame
+    df.loc[missing_mask, "Gender"] = df.loc[missing_mask, name_col].map(gender_map)
 
-            # Update only missing genders
-            df.loc[missing_gender_mask, "Gender"] = df.loc[missing_gender_mask, "Full Name"].map(gender_map)
-        else:
-            print("✅ No missing gender values found. Skipping API requests.")
-    except Exception as e:
-        print(f"❌ An unexpected error occurred: {e}")
-    finally:
-        # Save progress regardless of success or error
-        output_file = "enhanced_salesforce_report.xlsx"
-        df.to_excel(output_file, index=False)
-        print(f"\n💾 Progress saved to '{output_file}' (even if an error occurred).")
+    # Capitalize first letter
+    df["Gender"] = df["Gender"].str.capitalize()
 
-    print("✅ Script finished.")
+    return df
+
+# For our data:
+if __name__ == "__main__":
+    df = pd.read_excel("cleaned_salesforce_report.xlsx")
+    enhanced_df = enhance_gender(df)
+    enhanced_df.to_excel("enhanced_salesforce_report.xlsx", index=False)
+    print("Gender column updated and saved!")
